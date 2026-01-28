@@ -28,12 +28,12 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        gameView.onHostShow();
+        gameView.onResume();
     }
 
     @Override
     protected void onPause() {
-        gameView.onHostHide();
+        gameView.onPause();
         super.onPause();
     }
 

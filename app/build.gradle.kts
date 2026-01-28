@@ -30,6 +30,5 @@ android {
 }
 
 dependencies {
-    implementation(files("libs/migo.aar"))
-    implementation(libs.androidx.core.ktx)
+    implementation(files("../../migo/platforms/android/dist/migo-debug.aar"))
 }

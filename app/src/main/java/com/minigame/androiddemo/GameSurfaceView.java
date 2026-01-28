@@ -1,17 +1,18 @@
 package com.minigame.androiddemo;
 
 import android.app.Activity;
-import android.content.Context;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 
-import com.minigame.host.HostHandle;
-import com.minigame.host.InitOption;
-import com.minigame.host.MiniGameSDK;
+import com.migo.runtime.GameSession;
+import com.migo.runtime.MigoRuntime;
+import com.migo.runtime.RuntimeConfig;
 
 public final class GameSurfaceView extends SurfaceView implements SurfaceHolder.Callback {
-    private HostHandle host;
+    private static final String GAME_ID = "migo-test-suit";
+
+    private GameSession session;
     private final Activity activity;
 
     public GameSurfaceView(Activity activity) {
@@ -24,56 +25,59 @@ public final class GameSurfaceView extends SurfaceView implements SurfaceHolder.
 
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
-        InitOption option = new InitOption.Builder(getContext()).build();
+        RuntimeConfig config = new RuntimeConfig.Builder(getContext())
+                .setDebugEnabled(true)
+                .build();
 
-        host = MiniGameSDK.getInstance().initialize(holder.getSurface(), activity, option);
+        session = MigoRuntime.getInstance()
+                .createSession(activity, holder.getSurface(), config, GAME_ID);
 
-        if (host != null) {
-            String codeDir = getContext().getFilesDir().getAbsolutePath() + "/minigame";
-            host.startGame(codeDir, "game.js");
+        if (session != null) {
+            // Game code should be deployed to: filesDir/games/{gameId}/code/
+            // e.g., /data/data/com.minigame.androiddemo/files/games/demo/code/game.js
+            session.startGame("game.js");
         }
     }
 
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-        if (host != null) {
-            host.updateSurface(holder.getSurface());
+        if (session != null) {
+            session.updateSurface(holder.getSurface());
         }
     }
 
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
-        if (host != null) {
-            host.destroy();
-            host = null;
+        if (session != null) {
+            session.close();
+            session = null;
         }
     }
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        if (host != null) {
-            host.onTouch(event);
-            return true;
+        if (session != null) {
+            return session.dispatchTouchEvent(event);
         }
         return false;
     }
 
-    public void onHostShow() {
-        if (host != null) {
-            host.onShow();
+    public void onResume() {
+        if (session != null) {
+            session.resume();
         }
     }
 
-    public void onHostHide() {
-        if (host != null) {
-            host.onHide();
+    public void onPause() {
+        if (session != null) {
+            session.pause();
         }
     }
 
     public void release() {
-        if (host != null) {
-            host.destroy();
-            host = null;
+        if (session != null) {
+            session.close();
+            session = null;
         }
     }
 }
