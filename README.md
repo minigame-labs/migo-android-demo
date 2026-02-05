@@ -73,13 +73,10 @@ RuntimeConfig config = new RuntimeConfig.Builder(context)
 // 创建会话
 GameSession session = MigoRuntime.getInstance()
     .createSession(activity, surface, config, "demo");  // "demo" 是 gameId
-```
 
-### 启动游戏
+// 启动游戏
+session.startGame("game.js");
 
-```java
-// 游戏代码位于: filesDir/migo/games/{gameId}/code/
-session.startGame("game.js");  // 入口文件
 ```
 
 ### 处理输入

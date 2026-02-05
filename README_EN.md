@@ -73,13 +73,10 @@ RuntimeConfig config = new RuntimeConfig.Builder(context)
 // Create session
 GameSession session = MigoRuntime.getInstance()
     .createSession(activity, surface, config, "demo");  // "demo" is the gameId
-```
 
-### Start Game
+// Start Game
+session.startGame("game.js");
 
-```java
-// Game code is located at: filesDir/migo/games/{gameId}/code/
-session.startGame("game.js");  // Entry point file
 ```
 
 ### Handle Input
