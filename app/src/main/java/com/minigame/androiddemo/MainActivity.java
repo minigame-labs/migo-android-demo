@@ -5,7 +5,11 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
+import android.view.Gravity;
 
+import com.migo.runtime.DebugOverlayView;
 import com.migo.runtime.ErrorCode;
 import com.migo.runtime.GameSession;
 import com.migo.runtime.MigoRuntime;
@@ -29,12 +33,13 @@ public class MainActivity extends Activity {
 
     private GameSession session;
     private SurfaceView surfaceView;
+    private FrameLayout rootLayout;
 
     // Game configuration (adjust to your needs)
     // gameId is used to create isolated directories in:
     //   files/migo/games/{gameId}/ and cache/migo/games/{gameId}/
-//    private static final String GAME_ID = "demo";
-    private static final String GAME_ID = "migo-test-suit";
+    private static final String GAME_ID = "demo";
+//    private static final String GAME_ID = "migo-test-suit";
     private static final String GAME_ENTRY = "game.js";
 
     @Override
@@ -51,9 +56,16 @@ public class MainActivity extends Activity {
 
         Log.i(TAG, "Migo Runtime v" + runtime.getVersion() + " (native: " + runtime.getNativeVersion() + ")");
 
+        // Create root layout
+        rootLayout = new FrameLayout(this);
+
         // Create surface view for rendering
         surfaceView = new SurfaceView(this);
-        setContentView(surfaceView);
+        rootLayout.addView(surfaceView, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+
+        setContentView(rootLayout);
 
         // Set up surface callbacks
         surfaceView.getHolder().addCallback(new SurfaceHolder.Callback() {
@@ -119,6 +131,22 @@ public class MainActivity extends Activity {
         }
 
         session = result.getValue();
+
+        // Add debug overlay if available
+        DebugOverlayView overlay = session.getDebugOverlay();
+        if (overlay != null) {
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    Gravity.TOP | Gravity.END);
+
+            float density = getResources().getDisplayMetrics().density;
+            int margin = (int) (8 * density);
+            int topMargin = (int) (30 * density);
+
+            lp.setMargins(0, topMargin, margin, 0);
+            rootLayout.addView(overlay, lp);
+        }
 
         // Set up callbacks
         setupCallbacks();
