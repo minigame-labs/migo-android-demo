@@ -5,9 +5,9 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
-import android.view.ViewGroup;
-import android.widget.FrameLayout;
 import android.view.Gravity;
+import android.widget.FrameLayout;
+import android.view.ViewGroup;
 
 import com.migo.runtime.DebugOverlayView;
 import com.migo.runtime.ErrorCode;
@@ -17,6 +17,7 @@ import com.migo.runtime.RuntimeConfig;
 import com.migo.runtime.callback.OnErrorListener;
 import com.migo.runtime.callback.OnGameEventListener;
 import com.migo.runtime.callback.OnLifecycleListener;
+import com.minigame.androiddemo.ui.CapsuleMenu;
 
 /**
  * Sample Activity demonstrating Migo Runtime integration.
@@ -41,6 +42,9 @@ public class MainActivity extends Activity {
     private static final String GAME_ID = "demo";
 //    private static final String GAME_ID = "migo-test-suit";
     private static final String GAME_ENTRY = "game.js";
+    
+    // UI
+    private CapsuleMenu capsuleMenu;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -66,6 +70,9 @@ public class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT));
 
         setContentView(rootLayout);
+
+        // Add Capsule Menu
+        addCapsuleMenu();
 
         // Set up surface callbacks
         surfaceView.getHolder().addCallback(new SurfaceHolder.Callback() {
@@ -111,6 +118,48 @@ public class MainActivity extends Activity {
         });
     }
 
+    private void addCapsuleMenu() {
+        capsuleMenu = new CapsuleMenu(this, new CapsuleMenu.OnMenuActionListener() {
+            @Override
+            public void onRestart() {
+                restartGame();
+            }
+
+            @Override
+            public void onExit() {
+                finish();
+            }
+        });
+
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        
+        lp.gravity = Gravity.TOP | Gravity.END;
+        float density = getResources().getDisplayMetrics().density;
+        // Position it below the status bar (approx) and with right margin
+        // Assuming status bar + padding is around 40-50dp
+        lp.topMargin = (int) (40 * density); 
+        lp.rightMargin = (int) (10 * density); 
+        
+        // Ensure it's above other views
+        capsuleMenu.setElevation(10 * density);
+        
+        rootLayout.addView(capsuleMenu, lp);
+    }
+
+    private void restartGame() {
+        Log.i(TAG, "Restarting game...");
+        if (session != null) {
+            // Use native restart command which is more efficient and reliable
+            // as it preserves the surface and handles cleanup internally.
+            session.restart();
+        } else {
+            // Fallback to full re-initialization if session is null
+            initializeGame(surfaceView.getHolder());
+        }
+    }
+
     /**
      * Initialize the game session.
      */
@@ -144,7 +193,10 @@ public class MainActivity extends Activity {
             int margin = (int) (8 * density);
             int topMargin = (int) (30 * density);
 
-            lp.setMargins(0, topMargin, margin, 0);
+            // Move debug overlay to left side to avoid overlap with CapsuleMenu
+            lp.gravity = Gravity.TOP | Gravity.START;
+            lp.setMargins(margin, topMargin, 0, 0);
+            
             rootLayout.addView(overlay, lp);
         }
 
