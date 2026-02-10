@@ -48,13 +48,13 @@ public class CapsuleMenu extends LinearLayout {
 
         // Dimensions
         mHeight = (int) (32 * density);
-        mWidth = (int) (100 * density); // Standard capsule width ~87dp
+        mWidth = (int) (80 * density); // Standard capsule width ~87dp, reduced for 2 dots
         
         // Set layout params for self
         // Note: The parent layout params should be set by the caller (e.g. FrameLayout.LayoutParams)
         
         // 1. Menu Button (...)
-        TextView menuBtn = createButton(context, "•••");
+        TextView menuBtn = createButton(context, "••");
         menuBtn.setOnClickListener(v -> showMenuDialog(context));
         
         // 2. Divider
@@ -93,7 +93,10 @@ public class CapsuleMenu extends LinearLayout {
         btn.setText(text);
         btn.setGravity(Gravity.CENTER);
         btn.setTextColor(Color.BLACK);
-        btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        // Use a smaller font size to fit "•••" within the capsule width
+        btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        btn.setPadding(0, 0, 0, 0);
+        btn.setIncludeFontPadding(false);
         // Make font bold for better visibility
         btn.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         return btn;
