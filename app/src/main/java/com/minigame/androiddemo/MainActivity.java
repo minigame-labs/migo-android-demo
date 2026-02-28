@@ -165,7 +165,7 @@ public class MainActivity extends Activity {
      */
     private void initializeGame(SurfaceHolder holder) {
         // Build configuration
-        RuntimeConfig config = new RuntimeConfig.Builder(this).setTargetFps(60).setDebugEnabled(true).setLogLevel(RuntimeConfig.LogLevel.DEBUG).build();
+        RuntimeConfig config = new RuntimeConfig.Builder(this).setTargetFps(60).setDebugEnabled(true).setLogLevel(RuntimeConfig.LogLevel.DEBUG).setCodeSigningEnabled(false).build();
 
         Log.d(TAG, "Config: " + config);
 
