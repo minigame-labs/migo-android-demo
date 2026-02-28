@@ -272,11 +272,6 @@ public class MainActivity extends Activity {
             }
 
             @Override
-            public void onInitialized() {
-                Log.d(TAG, "Runtime initialized");
-            }
-
-            @Override
             public void onDestroyed() {
                 Log.d(TAG, "Runtime destroyed");
             }
@@ -289,11 +284,6 @@ public class MainActivity extends Activity {
             @Override
             public void onResumed() {
                 Log.d(TAG, "Runtime resumed");
-            }
-
-            @Override
-            public void onSurfaceChanged(int width, int height) {
-                Log.d(TAG, "Surface: " + width + "x" + height);
             }
         });
     }
