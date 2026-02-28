@@ -14,9 +14,7 @@ import com.migo.runtime.ErrorCode;
 import com.migo.runtime.GameSession;
 import com.migo.runtime.MigoRuntime;
 import com.migo.runtime.RuntimeConfig;
-import com.migo.runtime.callback.OnErrorListener;
-import com.migo.runtime.callback.OnGameEventListener;
-import com.migo.runtime.callback.OnLifecycleListener;
+import com.migo.runtime.callback.GameSessionListener;
 import com.minigame.androiddemo.ui.CapsuleMenu;
 
 /**
@@ -39,8 +37,8 @@ public class MainActivity extends Activity {
     // Game configuration (adjust to your needs)
     // gameId is used to create isolated directories in:
     //   files/migo/games/{gameId}/ and cache/migo/games/{gameId}/
-    private static final String GAME_ID = "demo";
-//    private static final String GAME_ID = "migo-test-suit";
+//    private static final String GAME_ID = "demo";
+    private static final String GAME_ID = "migo-test-suit";
     private static final String GAME_ENTRY = "game.js";
     
     // UI
@@ -216,8 +214,8 @@ public class MainActivity extends Activity {
      * Set up game callbacks.
      */
     private void setupCallbacks() {
-        // Game events
-        session.setOnGameEventListener(new OnGameEventListener() {
+        // Unified GameSessionListener handles game events, errors, and lifecycle
+        session.setListener(new GameSessionListener() {
             @Override
             public void onGameReady() {
                 Log.i(TAG, "Game is ready!");
@@ -236,6 +234,17 @@ public class MainActivity extends Activity {
                         // Show error or restart option
                     }
                 });
+            }
+
+            @Override
+            public void onError(int errorCode, String message, boolean recoverable) {
+                Log.e(TAG, "Error [" + errorCode + "]: " + message + " (recoverable: " + recoverable + ")");
+                if (!recoverable) {
+                    runOnUiThread(() -> {
+                        // Show error dialog and finish
+                        showErrorAndFinish(message);
+                    });
+                }
             }
 
             @Override
@@ -261,22 +270,7 @@ public class MainActivity extends Activity {
                     // Update progress bar
                 });
             }
-        });
 
-        // Error handling
-        session.setOnErrorListener((errorCode, message, recoverable) -> {
-            Log.e(TAG, "Error [" + errorCode + "]: " + message + " (recoverable: " + recoverable + ")");
-
-            if (!recoverable) {
-                runOnUiThread(() -> {
-                    // Show error dialog and finish
-                    showErrorAndFinish(message);
-                });
-            }
-        });
-
-        // Lifecycle events
-        session.setOnLifecycleListener(new OnLifecycleListener() {
             @Override
             public void onInitialized() {
                 Log.d(TAG, "Runtime initialized");

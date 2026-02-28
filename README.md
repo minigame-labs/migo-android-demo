@@ -79,6 +79,32 @@ session.startGame("game.js");
 
 ```
 
+### 监听事件
+
+```java
+import com.migo.runtime.callback.GameSessionListener;
+
+session.setListener(new GameSessionListener() {
+    @Override
+    public void onGameReady() {
+        // 游戏加载完成
+    }
+
+    @Override
+    public void onGameExit(int exitCode) {
+        // 游戏退出
+        if (exitCode == 0) {
+            finish();
+        }
+    }
+
+    @Override
+    public void onError(int errorCode, String message, boolean recoverable) {
+        // 运行时错误
+    }
+});
+```
+
 ### 处理输入
 
 ```java
