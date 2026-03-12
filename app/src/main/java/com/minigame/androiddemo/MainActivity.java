@@ -2,6 +2,7 @@ package com.minigame.androiddemo;
 
 import android.app.Activity;
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.util.Log;
@@ -315,6 +316,14 @@ public class MainActivity extends Activity {
     }
 
     // ==================== Activity Lifecycle ====================
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (session != null && session.isValid()) {
+            session.dispatchActivityResult(requestCode, resultCode, data);
+        }
+    }
 
     @Override
     protected void onPause() {
