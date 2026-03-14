@@ -318,14 +318,6 @@ public class MainActivity extends Activity {
     // ==================== Activity Lifecycle ====================
 
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (session != null && session.isValid()) {
-            session.dispatchActivityResult(requestCode, resultCode, data);
-        }
-    }
-
-    @Override
     protected void onPause() {
         super.onPause();
         if (session != null && session.isValid()) {
