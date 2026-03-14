@@ -44,21 +44,30 @@ Open the project in Android Studio, or build via command line:
 adb install app/build/outputs/apk/debug/app-debug.apk
 ```
 
-## Project Structure
+## Three Integration Approaches
 
+The demo showcases three integration approaches, in order of increasing complexity:
+
+### Approach 1: MigoGameActivity (Simplest)
+
+Launch a game with one line of code. The SDK handles all lifecycle, Surface management, and touch events internally.
+
+```java
+import com.migo.runtime.MigoGameActivity;
+
+// One-line launch
+MigoGameActivity.launch(context, "demo", "game.js");
+
+// Or with custom config
+RuntimeConfig config = new RuntimeConfig.Builder(context)
+    .setDebugEnabled(true)
+    .build();
+MigoGameActivity.launch(context, "demo", "game.js", config);
 ```
-app/
-├── libs/
-│   └── migo.aar                  # Migo SDK (manual placement required)
-└── src/main/
-    ├── java/.../
-    │   ├── MainActivity.java     # Main Activity
-    └── AndroidManifest.xml
-```
 
-## SDK API Usage
+### Approach 2: Custom Activity (Full Control)
 
-### Initialization
+Manually manage GameSession for scenarios that require custom UI overlays, custom error handling, or integration with other Android components.
 
 ```java
 import com.migo.runtime.MigoRuntime;
@@ -67,38 +76,92 @@ import com.migo.runtime.RuntimeConfig;
 
 // Create configuration
 RuntimeConfig config = new RuntimeConfig.Builder(context)
+    .setTargetFps(60)
     .setDebugEnabled(true)
+    .setCodeSigningEnabled(false)
     .build();
 
-// Create session
-GameSession session = MigoRuntime.getInstance()
-    .createSession(activity, surface, config, "demo");  // "demo" is the gameId
+// Create session (safe version, no exceptions)
+MigoRuntime.Result<GameSession> result = MigoRuntime.getInstance()
+    .createSessionSafe(activity, surface, config, "demo");
 
-// Start Game
-session.startGame("game.js");
-
-```
-
-### Handle Input
-
-```java
-@Override
-public boolean onTouchEvent(MotionEvent event) {
-    return session.dispatchTouchEvent(event);
+if (result.isSuccess()) {
+    GameSession session = result.getValue();
+    session.setListener(listener);
+    session.startGameSafe("game.js");
 }
+
+// Lifecycle management
+session.pause();    // Activity.onPause()
+session.resume();   // Activity.onResume()
+session.restart();  // Restart game
+session.close();    // Activity.onDestroy()
 ```
 
-### Lifecycle Management
+### Approach 3: MigoGameView (Embedded)
+
+Embed the game as a View in any layout. Ideal when you need native UI elements around the game.
 
 ```java
-// Activity.onResume()
-session.resume();
+import com.migo.runtime.MigoGameView;
 
-// Activity.onPause()
-session.pause();
+MigoGameView gameView = new MigoGameView(context);
 
-// Activity.onDestroy()
-session.close();
+// Configure
+RuntimeConfig config = new RuntimeConfig.Builder(context)
+    .setDebugEnabled(true)
+    .build();
+gameView.setConfig(config);
+
+// Set listener
+gameView.setGameListener(listener);
+
+// Add to layout
+myLayout.addView(gameView);
+
+// Load game
+gameView.loadGame("demo", "game.js");
+```
+
+## Event Handling
+
+```java
+import com.migo.runtime.callback.GameSessionListener;
+
+session.setListener(new GameSessionListener() {
+    @Override
+    public void onGameReady() {
+        // Game loaded and ready - hide loading screen
+    }
+
+    @Override
+    public void onGameExit(int exitCode) {
+        // Game exited, exitCode == 0 means normal exit
+    }
+
+    @Override
+    public void onError(int errorCode, String message, boolean recoverable) {
+        // Runtime error
+        // recoverable=true: non-fatal, game can continue
+        // recoverable=false: fatal, should close
+    }
+});
+```
+
+## Project Structure
+
+```
+app/
+├── libs/
+│   └── migo.aar                        # Migo SDK (manual placement required)
+└── src/main/
+    ├── java/.../
+    │   ├── MainActivity.java           # Demo selector
+    │   ├── CustomGameActivity.java     # Approach 2: Manual GameSession control
+    │   ├── EmbeddedGameActivity.java   # Approach 3: MigoGameView embedding
+    │   └── ui/
+    │       └── CapsuleMenu.java        # Capsule menu UI component
+    └── AndroidManifest.xml
 ```
 
 ## Game Directory Structure
@@ -111,6 +174,19 @@ session.close();
 ├── cache/          # Cache directory (read-write)
 └── data/           # Data directory (read-write)
 ```
+
+## Core SDK Classes
+
+| Class | Description |
+|-------|-------------|
+| `MigoRuntime` | SDK entry point (singleton), device checks, session creation |
+| `GameSession` | Game session, manages lifecycle, input, Surface |
+| `RuntimeConfig` | Configuration (Builder pattern), FPS/debug/signing etc. |
+| `MigoGameActivity` | Ready-to-use Activity, one-line game launch |
+| `MigoGameView` | Embeddable FrameLayout, auto lifecycle management |
+| `GameSessionListener` | Event callback interface |
+| `ErrorCode` | Error code constants |
+| `DebugOverlayView` | Debug overlay (auto-shown in debug mode) |
 
 ## License
 
