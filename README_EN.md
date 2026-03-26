@@ -4,17 +4,27 @@ Android sample project for the [Migo](https://github.com/minigame-labs/migo) min
 
 ## Quick Start
 
-### 1. Get Migo AAR
+### 1. Build Migo AAR
 
-Download the latest `migo.aar` from [Migo Releases](https://github.com/minigame-labs/migo/releases), or build from source:
+This demo currently depends on the local `../migo` build output:
+
+- `../migo/platforms/android/dist/migo-debug.aar`
+
+Build it first in the `migo` repo:
 
 ```bash
-git clone https://github.com/minigame-labs/migo.git
-cd migo
-./scripts/build-aar.ps1 -BuildType release
+cd ../migo
+bash scripts/build-aar.sh debug
 ```
 
-Copy the generated AAR file to `app/libs/migo.aar`.
+If you want release AAR instead, build:
+
+```bash
+cd ../migo
+bash scripts/build-aar.sh release
+```
+
+Then adjust the AAR path in `app/build.gradle.kts` if needed.
 
 ### 2. Prepare Game Files
 
@@ -24,6 +34,7 @@ Game files should be placed in the app's private directory with the following pa
 /data/data/com.minigame.androiddemo/files/migo/games/{gameId}/code/
 ├── game.js          # Game entry file
 ├── images/          # Image assets
+├── workers/         # Worker scripts (if used)
 └── ...              # Other resources
 ```
 
@@ -33,6 +44,17 @@ Example: Push a `demo` game:
 
 ```bash
 adb push your-game/ /data/data/com.minigame.androiddemo/files/migo/games/demo/code/
+```
+
+> Note: the SDK no longer auto-reads `game.json` for `workers` / `subPackages`.
+> This demo now reads `code/game.json` on the host side and injects these fields into `RuntimeConfig`.
+> You can also inject them manually:
+
+```java
+RuntimeConfig config = new RuntimeConfig.Builder(context)
+    .setWorkersPath("workers")
+    // .addSubPackage("stage1", "subpackages/stage1")
+    .build();
 ```
 
 ### 3. Build and Run
@@ -88,6 +110,12 @@ MigoRuntime.Result<GameSession> result = MigoRuntime.getInstance()
 if (result.isSuccess()) {
     GameSession session = result.getValue();
     session.setListener(listener);
+
+    // Latest API: optional host handlers (prefer before startGame)
+    session.setAuthHandler(authHandler);
+    session.setGameLogHandler(gameLogHandler);
+    session.setSubpackageHandler(subpackageHandler);
+
     session.startGameSafe("game.js");
 }
 
@@ -121,6 +149,14 @@ myLayout.addView(gameView);
 
 // Load game
 gameView.loadGame("demo", "game.js");
+
+// MigoGameView creates session internally, so register handlers when available
+GameSession session = gameView.getSession();
+if (session != null) {
+    session.setAuthHandler(authHandler);
+    session.setGameLogHandler(gameLogHandler);
+    session.setSubpackageHandler(subpackageHandler);
+}
 ```
 
 ## Event Handling
@@ -148,20 +184,40 @@ session.setListener(new GameSessionListener() {
 });
 ```
 
+## Host Handlers (Latest API)
+
+`GameSession` now supports these host callback handlers:
+
+- `setAuthHandler(AuthHandler)`: handles `wx.login` / `wx.checkSession` / `wx.getUserInfo` / `wx.getPhoneNumber`
+- `setGameLogHandler(GameLogHandler)`: receives game-reported logs (JSON)
+- `setSubpackageHandler(SubpackageHandler)`: handles `loadSubpackage` / `preDownloadSubpackage`
+
+Sample implementations in this demo:
+
+- `app/src/main/java/com/minigame/androiddemo/auth/ProxyAuthHandler.java`
+- `app/src/main/java/com/minigame/androiddemo/DemoGameLogHandler.java`
+- `app/src/main/java/com/minigame/androiddemo/DemoSubpackageHandler.java`
+
+For auth proxy operation details, see: `AUTH_PROXY_RUNBOOK.md`
+
 ## Project Structure
 
 ```
 app/
-├── libs/
-│   └── migo.aar                        # Migo SDK (manual placement required)
 └── src/main/
     ├── java/.../
     │   ├── MainActivity.java           # Demo selector
     │   ├── CustomGameActivity.java     # Approach 2: Manual GameSession control
     │   ├── EmbeddedGameActivity.java   # Approach 3: MigoGameView embedding
+    │   ├── DemoGameLogHandler.java     # GameLogHandler sample
+    │   ├── DemoSubpackageHandler.java  # SubpackageHandler sample
+    │   ├── auth/
+    │   │   └── ProxyAuthHandler.java   # AuthHandler sample
     │   └── ui/
     │       └── CapsuleMenu.java        # Capsule menu UI component
     └── AndroidManifest.xml
+
+AUTH_PROXY_RUNBOOK.md                    # Separate auth proxy runbook
 ```
 
 ## Game Directory Structure
@@ -171,8 +227,10 @@ app/
 ├── code/           # Game code directory (read-only)
 │   ├── game.js
 │   └── images/
-├── cache/          # Cache directory (read-write)
-└── data/           # Data directory (read-write)
+└── user_data/      # User data directory (read-write)
+
+/data/data/{packageName}/cache/migo/games/{gameId}/
+└── tmp/            # Temporary directory (auto-cleaned on session close)
 ```
 
 ## Core SDK Classes

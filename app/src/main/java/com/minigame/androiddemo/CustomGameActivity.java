@@ -14,6 +14,7 @@ import com.migo.runtime.GameSession;
 import com.migo.runtime.MigoRuntime;
 import com.migo.runtime.RuntimeConfig;
 import com.migo.runtime.callback.GameSessionListener;
+import com.minigame.androiddemo.auth.ProxyAuthHandler;
 import com.minigame.androiddemo.ui.CapsuleMenu;
 
 /**
@@ -32,6 +33,12 @@ import com.minigame.androiddemo.ui.CapsuleMenu;
 public class CustomGameActivity extends Activity {
 
     private static final String TAG = "CustomGameActivity";
+    public static final String EXTRA_AUTH_RELAY_URL = "auth_relay_url";
+
+    // Auth proxy relay server URL.
+    // - Emulator:    "http://10.0.2.2:9527"
+    // - Real device: "http://<PC_LAN_IP>:9527" (e.g. "http://192.168.1.100:9527")
+    private static final String DEFAULT_AUTH_RELAY_URL = "http://10.0.2.2:9527";
 
     private GameSession session;
     private SurfaceView surfaceView;
@@ -46,9 +53,14 @@ public class CustomGameActivity extends Activity {
         String entryPoint = getIntent().getStringExtra("entry_point");
         if (gameId == null) gameId = "demo";
         if (entryPoint == null) entryPoint = "game.js";
+        String relayUrl = getIntent().getStringExtra(EXTRA_AUTH_RELAY_URL);
+        if (relayUrl == null || relayUrl.trim().isEmpty()) {
+            relayUrl = DEFAULT_AUTH_RELAY_URL;
+        }
 
         final String finalGameId = gameId;
         final String finalEntryPoint = entryPoint;
+        final String finalRelayUrl = relayUrl;
 
         // Create root layout
         rootLayout = new FrameLayout(this);
@@ -74,7 +86,7 @@ public class CustomGameActivity extends Activity {
                     Log.d(TAG, "Surface recreated, updated session surface");
                 } else {
                     // First-time initialization.
-                    initializeGame(holder, finalGameId, finalEntryPoint);
+                    initializeGame(holder, finalGameId, finalEntryPoint, finalRelayUrl);
                 }
             }
 
@@ -101,14 +113,16 @@ public class CustomGameActivity extends Activity {
         });
     }
 
-    private void initializeGame(SurfaceHolder holder, String gameId, String entryPoint) {
+    private void initializeGame(SurfaceHolder holder, String gameId, String entryPoint, String relayUrl) {
         // Build configuration
-        RuntimeConfig config = new RuntimeConfig.Builder(this)
+        RuntimeConfig.Builder builder = new RuntimeConfig.Builder(this)
                 .setTargetFps(60)
                 .setDebugEnabled(true)
                 .setLogLevel(RuntimeConfig.LogLevel.DEBUG)
                 .setCodeSigningEnabled(false)
-                .build();
+                ;
+        RuntimeConfigCompat.injectFromGameConfig(builder, GameConfigLoader.load(this, gameId));
+        RuntimeConfig config = builder.build();
 
         // Create session (safe version with error handling)
         MigoRuntime.Result<GameSession> result = MigoRuntime.getInstance()
@@ -123,6 +137,15 @@ public class CustomGameActivity extends Activity {
         }
 
         session = result.getValue();
+
+        // Register latest host handlers before startGame() for best compatibility.
+        session.setGameLogHandler(new DemoGameLogHandler());
+        session.setSubpackageHandler(new DemoSubpackageHandler(session.getPaths().getCodeDir()));
+
+        // Register auth handler — proxies wx.login/checkSession/getUserInfo to
+        // a relay server that forwards to a real WeChat instance on PC.
+        session.setAuthHandler(new ProxyAuthHandler(relayUrl, gameId));
+        Log.i(TAG, "Host handlers enabled: auth/gameLog/subpackage, relay=" + relayUrl);
 
         // Set up callbacks
         session.setListener(new GameSessionListener() {

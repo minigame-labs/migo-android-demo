@@ -9,9 +9,11 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.migo.runtime.GameSession;
 import com.migo.runtime.MigoGameView;
 import com.migo.runtime.RuntimeConfig;
 import com.migo.runtime.callback.GameSessionListener;
+import com.minigame.androiddemo.auth.ProxyAuthHandler;
 
 /**
  * Demo Activity showing how to embed a game using MigoGameView.
@@ -30,11 +32,20 @@ public class EmbeddedGameActivity extends Activity {
     private static final String GAME_ID = "migo-test-suit";
     private static final String GAME_ENTRY = "game.js";
 
+    // Auth proxy relay server URL (same as CustomGameActivity)
+    private static final String DEFAULT_AUTH_RELAY_URL = "http://10.0.2.2:9527";
+
     private MigoGameView gameView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        String relayUrl = getIntent().getStringExtra(CustomGameActivity.EXTRA_AUTH_RELAY_URL);
+        if (relayUrl == null || relayUrl.trim().isEmpty()) {
+            relayUrl = DEFAULT_AUTH_RELAY_URL;
+        }
+        final String finalRelayUrl = relayUrl;
 
         // Root layout: vertical - title bar on top, game view below
         LinearLayout root = new LinearLayout(this);
@@ -75,10 +86,12 @@ public class EmbeddedGameActivity extends Activity {
         gameView = new MigoGameView(this);
 
         // Configure
-        RuntimeConfig config = new RuntimeConfig.Builder(this)
+        RuntimeConfig.Builder builder = new RuntimeConfig.Builder(this)
                 .setDebugEnabled(true)
                 .setCodeSigningEnabled(false)
-                .build();
+                ;
+        RuntimeConfigCompat.injectFromGameConfig(builder, GameConfigLoader.load(this, GAME_ID));
+        RuntimeConfig config = builder.build();
         gameView.setConfig(config);
 
         // Set listener
@@ -107,6 +120,24 @@ public class EmbeddedGameActivity extends Activity {
 
         // Load game
         gameView.loadGame(GAME_ID, GAME_ENTRY);
+
+        // Register host handlers once the session is available.
+        // MigoGameView creates the session internally after surface creation,
+        // so we poll in a background thread until getSession() returns non-null.
+        new Thread(() -> {
+            for (int i = 0; i < 200; i++) { // up to 10 seconds
+                GameSession s = gameView.getSession();
+                if (s != null) {
+                    s.setGameLogHandler(new DemoGameLogHandler());
+                    s.setSubpackageHandler(new DemoSubpackageHandler(s.getPaths().getCodeDir()));
+                    s.setAuthHandler(new ProxyAuthHandler(finalRelayUrl));
+                    Log.i(TAG, "Host handlers registered: auth/gameLog/subpackage, relay=" + finalRelayUrl);
+                    return;
+                }
+                try { Thread.sleep(50); } catch (InterruptedException e) { return; }
+            }
+            Log.w(TAG, "Timed out waiting for session to register host handlers");
+        }, "host-handler-setup").start();
     }
 
     private int dp(int dp) {

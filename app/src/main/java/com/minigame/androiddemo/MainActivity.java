@@ -30,8 +30,14 @@ public class MainActivity extends Activity {
     private static final String TAG = "MigoDemo";
 
     // Game configuration
-    private static final String GAME_ID = "migo-test-suit";
+    private static final String GAME_ID = "hxddd";
+//    private static final String GAME_ID = "migo-test-suit";
     private static final String GAME_ENTRY = "game.js";
+
+    // Auth relay URL used by demo AuthHandler proxy.
+    // - Emulator:    http://10.0.2.2:9527
+    // - Real device: http://<PC_LAN_IP>:9527
+    private static final String AUTH_RELAY_URL = "http://10.0.2.2:9527";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -67,16 +73,16 @@ public class MainActivity extends Activity {
         version.setGravity(Gravity.CENTER);
         version.setPadding(0, dp(4), 0, dp(32));
 
-        // Option 1: MigoGameActivity (simplest)
-        Button btn1 = createButton("1. MigoGameActivity (Simplest)");
+        // Option 1: MigoGameActivity with diagnostic logs
+        Button btn1 = createButton("1. MigoGameActivity (Debug Logs)");
         btn1.setOnClickListener(v -> launchWithGameActivity());
 
-        // Option 2: Custom Activity with full GameSession control
-        Button btn2 = createButton("2. Custom Activity (Full Control)");
+        // Option 2: Custom Activity with full GameSession control + host handlers
+        Button btn2 = createButton("2. Custom Activity (Full Control + Handlers)");
         btn2.setOnClickListener(v -> launchCustomActivity());
 
-        // Option 3: Embedded MigoGameView
-        Button btn3 = createButton("3. Embedded MigoGameView");
+        // Option 3: Embedded MigoGameView (handlers registered after session creation)
+        Button btn3 = createButton("3. Embedded MigoGameView (+Handlers)");
         btn3.setOnClickListener(v -> launchEmbeddedView());
 
         root.addView(title);
@@ -93,11 +99,13 @@ public class MainActivity extends Activity {
      * This is the simplest integration - one line of code.
      */
     private void launchWithGameActivity() {
-        RuntimeConfig config = new RuntimeConfig.Builder(this)
+        RuntimeConfig.Builder builder = new RuntimeConfig.Builder(this)
                 .setDebugEnabled(true)
                 .setCodeSigningEnabled(false)
-                .build();
-        com.migo.runtime.MigoGameActivity.launch(this, GAME_ID, GAME_ENTRY, config);
+                ;
+        RuntimeConfigCompat.injectFromGameConfig(builder, GameConfigLoader.load(this, GAME_ID));
+        RuntimeConfig config = builder.build();
+        DebugMigoGameActivity.launch(this, GAME_ID, GAME_ENTRY, config);
     }
 
     /**
@@ -107,6 +115,7 @@ public class MainActivity extends Activity {
         Intent intent = new Intent(this, CustomGameActivity.class);
         intent.putExtra("game_id", GAME_ID);
         intent.putExtra("entry_point", GAME_ENTRY);
+        intent.putExtra(CustomGameActivity.EXTRA_AUTH_RELAY_URL, AUTH_RELAY_URL);
         startActivity(intent);
     }
 
@@ -114,7 +123,9 @@ public class MainActivity extends Activity {
      * Option 3: Launch the embedded MigoGameView demo.
      */
     private void launchEmbeddedView() {
-        startActivity(new Intent(this, EmbeddedGameActivity.class));
+        Intent intent = new Intent(this, EmbeddedGameActivity.class);
+        intent.putExtra(CustomGameActivity.EXTRA_AUTH_RELAY_URL, AUTH_RELAY_URL);
+        startActivity(intent);
     }
 
     // ---- Helpers ----

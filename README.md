@@ -4,17 +4,27 @@
 
 ## 快速开始
 
-### 1. 获取 Migo AAR
+### 1. 构建 Migo AAR
 
-从 [Migo Releases](https://github.com/minigame-labs/migo/releases) 下载最新的 `migo.aar`，或从源码构建：
+当前 Demo 默认依赖本地 `../migo` 仓库产物：
+
+- `../migo/platforms/android/dist/migo-debug.aar`
+
+先在 `migo` 仓库执行：
 
 ```bash
-git clone https://github.com/minigame-labs/migo.git
-cd migo
-./scripts/build-aar.ps1 -BuildType release
+cd ../migo
+bash scripts/build-aar.sh debug
 ```
 
-将生成的 AAR 文件复制到 `app/libs/migo.aar`。
+如果你希望改用 release AAR，可先构建：
+
+```bash
+cd ../migo
+bash scripts/build-aar.sh release
+```
+
+然后按需修改 `app/build.gradle.kts` 中的 AAR 路径。
 
 ### 2. 准备游戏文件
 
@@ -24,6 +34,7 @@ cd migo
 /data/data/com.minigame.androiddemo/files/migo/games/{gameId}/code/
 ├── game.js          # 游戏入口文件
 ├── images/          # 图片资源
+├── workers/         # Worker 脚本目录（如有）
 └── ...              # 其他资源文件
 ```
 
@@ -33,6 +44,17 @@ cd migo
 
 ```bash
 adb push your-game/ /data/data/com.minigame.androiddemo/files/migo/games/demo/code/
+```
+
+> 注意：SDK 现在不会自动读取 `game.json` 来解析 `workers` / `subPackages`。
+> 本 Demo 已在宿主侧实现了 `code/game.json` 读取，并在创建 `RuntimeConfig` 时注入这些配置。
+> 你也可以手动注入：
+
+```java
+RuntimeConfig config = new RuntimeConfig.Builder(context)
+    .setWorkersPath("workers")
+    // .addSubPackage("stage1", "subpackages/stage1")
+    .build();
 ```
 
 ### 3. 构建运行
@@ -88,6 +110,12 @@ MigoRuntime.Result<GameSession> result = MigoRuntime.getInstance()
 if (result.isSuccess()) {
     GameSession session = result.getValue();
     session.setListener(listener);
+
+    // 最新 API: 可选注册宿主 handler（建议在 startGame 前）
+    session.setAuthHandler(authHandler);
+    session.setGameLogHandler(gameLogHandler);
+    session.setSubpackageHandler(subpackageHandler);
+
     session.startGameSafe("game.js");
 }
 
@@ -121,6 +149,14 @@ myLayout.addView(gameView);
 
 // 加载游戏
 gameView.loadGame("demo", "game.js");
+
+// MigoGameView 会在内部创建 session，需在 session 可用后注册 handler
+GameSession session = gameView.getSession();
+if (session != null) {
+    session.setAuthHandler(authHandler);
+    session.setGameLogHandler(gameLogHandler);
+    session.setSubpackageHandler(subpackageHandler);
+}
 ```
 
 ## 监听事件
@@ -148,20 +184,40 @@ session.setListener(new GameSessionListener() {
 });
 ```
 
+## 宿主 Handler（最新 API）
+
+`GameSession` 当前支持以下宿主回调：
+
+- `setAuthHandler(AuthHandler)`：处理 `wx.login` / `wx.checkSession` / `wx.getUserInfo` / `wx.getPhoneNumber`
+- `setGameLogHandler(GameLogHandler)`：接收小游戏上报日志（JSON）
+- `setSubpackageHandler(SubpackageHandler)`：处理 `loadSubpackage` / `preDownloadSubpackage`
+
+Demo 中的对应 sample 实现：
+
+- `app/src/main/java/com/minigame/androiddemo/auth/ProxyAuthHandler.java`
+- `app/src/main/java/com/minigame/androiddemo/DemoGameLogHandler.java`
+- `app/src/main/java/com/minigame/androiddemo/DemoSubpackageHandler.java`
+
+Auth 代理的独立操作文档见：`AUTH_PROXY_RUNBOOK.md`
+
 ## 项目结构
 
 ```
 app/
-├── libs/
-│   └── migo.aar                        # Migo SDK（需手动放置）
 └── src/main/
     ├── java/.../
     │   ├── MainActivity.java           # Demo 选择器
     │   ├── CustomGameActivity.java     # 方式 2: 手动 GameSession 管理
     │   ├── EmbeddedGameActivity.java   # 方式 3: MigoGameView 嵌入
+    │   ├── DemoGameLogHandler.java     # GameLogHandler sample
+    │   ├── DemoSubpackageHandler.java  # SubpackageHandler sample
+    │   ├── auth/
+    │   │   └── ProxyAuthHandler.java   # AuthHandler sample
     │   └── ui/
     │       └── CapsuleMenu.java        # 胶囊菜单 UI 组件
     └── AndroidManifest.xml
+
+AUTH_PROXY_RUNBOOK.md                    # Auth 代理独立操作文档
 ```
 
 ## 游戏目录结构
@@ -171,8 +227,10 @@ app/
 ├── code/           # 游戏代码目录 (只读)
 │   ├── game.js
 │   └── images/
-├── cache/          # 缓存目录 (可读写)
-└── data/           # 数据目录 (可读写)
+└── user_data/      # 用户数据目录 (可读写)
+
+/data/data/{packageName}/cache/migo/games/{gameId}/
+└── tmp/            # 临时目录 (会话结束自动清理)
 ```
 
 ## SDK 核心类
