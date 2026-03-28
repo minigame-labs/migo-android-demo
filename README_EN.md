@@ -46,13 +46,15 @@ Example: Push a `demo` game:
 adb push your-game/ /data/data/com.minigame.androiddemo/files/migo/games/demo/code/
 ```
 
-> Note: the SDK no longer auto-reads `game.json` for `workers` / `subPackages`.
-> This demo now reads `code/game.json` on the host side and injects these fields into `RuntimeConfig`.
+> Note: the SDK no longer auto-reads `game.json`.
+> This demo now reads `code/game.json` on the host side and injects
+> `workers` / `subPackages` / `deviceOrientation` (mapped to `startupOrientation`) into `RuntimeConfig`.
 > You can also inject them manually:
 
 ```java
 RuntimeConfig config = new RuntimeConfig.Builder(context)
     .setWorkersPath("workers")
+    .setStartupOrientation("landscape")
     // .addSubPackage("stage1", "subpackages/stage1")
     .build();
 ```
@@ -66,9 +68,9 @@ Open the project in Android Studio, or build via command line:
 adb install app/build/outputs/apk/debug/app-debug.apk
 ```
 
-## Three Integration Approaches
+## Two Integration Approaches
 
-The demo showcases three integration approaches, in order of increasing complexity:
+The demo keeps only two official integration approaches:
 
 ### Approach 1: MigoGameActivity (Simplest)
 
@@ -87,46 +89,7 @@ RuntimeConfig config = new RuntimeConfig.Builder(context)
 MigoGameActivity.launch(context, "demo", "game.js", config);
 ```
 
-### Approach 2: Custom Activity (Full Control)
-
-Manually manage GameSession for scenarios that require custom UI overlays, custom error handling, or integration with other Android components.
-
-```java
-import com.migo.runtime.MigoRuntime;
-import com.migo.runtime.GameSession;
-import com.migo.runtime.RuntimeConfig;
-
-// Create configuration
-RuntimeConfig config = new RuntimeConfig.Builder(context)
-    .setTargetFps(60)
-    .setDebugEnabled(true)
-    .setCodeSigningEnabled(false)
-    .build();
-
-// Create session (safe version, no exceptions)
-MigoRuntime.Result<GameSession> result = MigoRuntime.getInstance()
-    .createSessionSafe(activity, surface, config, "demo");
-
-if (result.isSuccess()) {
-    GameSession session = result.getValue();
-    session.setListener(listener);
-
-    // Latest API: optional host handlers (prefer before startGame)
-    session.setAuthHandler(authHandler);
-    session.setGameLogHandler(gameLogHandler);
-    session.setSubpackageHandler(subpackageHandler);
-
-    session.startGameSafe("game.js");
-}
-
-// Lifecycle management
-session.pause();    // Activity.onPause()
-session.resume();   // Activity.onResume()
-session.restart();  // Restart game
-session.close();    // Activity.onDestroy()
-```
-
-### Approach 3: MigoGameView (Embedded)
+### Approach 2: MigoGameView (Embedded)
 
 Embed the game as a View in any layout. Ideal when you need native UI elements around the game.
 
@@ -150,13 +113,12 @@ myLayout.addView(gameView);
 // Load game
 gameView.loadGame("demo", "game.js");
 
-// MigoGameView creates session internally, so register handlers when available
-GameSession session = gameView.getSession();
-if (session != null) {
+// Register handlers from session-created callback (before startGame)
+gameView.setSessionCreatedListener(session -> {
     session.setAuthHandler(authHandler);
     session.setGameLogHandler(gameLogHandler);
     session.setSubpackageHandler(subpackageHandler);
-}
+});
 ```
 
 ## Event Handling
@@ -198,7 +160,37 @@ Sample implementations in this demo:
 - `app/src/main/java/com/minigame/androiddemo/DemoGameLogHandler.java`
 - `app/src/main/java/com/minigame/androiddemo/DemoSubpackageHandler.java`
 
-For auth proxy operation details, see: `AUTH_PROXY_RUNBOOK.md`
+### Auth Relay Quick Runbook
+
+Relay client entry:
+
+- `app/src/main/java/com/minigame/androiddemo/auth/ProxyAuthHandler.java`
+
+Request contract:
+
+- Endpoint: `POST {relayBaseUrl}/auth/request`
+- Body: `{"action":"login|checkSession|getUserInfo|getPhoneNumber","params":{...},"gameId":"..."}`
+
+Response contract:
+
+- Success: `login/getPhoneNumber` -> `{"code":"..."}`, `checkSession` -> `{}`, `getUserInfo` -> `{"userInfo":...}`
+- Failure: `{"error":"reason","errno":123}` (`errno` optional)
+
+Demo integration points:
+
+- `DebugMigoGameActivity` registers `ProxyAuthHandler` in `onSessionCreated(...)`
+- `EmbeddedGameActivity` registers `ProxyAuthHandler` in `setSessionCreatedListener(...)`
+
+URL setup:
+
+- Emulator: `http://10.0.2.2:9527`
+- Real device: `http://<YOUR_PC_LAN_IP>:9527`
+
+Troubleshooting:
+
+- Check `ProxyAuthHandler` and activity logs for callback flow
+- Verify relay receives `/auth/request`
+- Ensure `gameId` routing matches your desktop-side proxy instance
 
 ## Project Structure
 
@@ -207,17 +199,15 @@ app/
 └── src/main/
     ├── java/.../
     │   ├── MainActivity.java           # Demo selector
-    │   ├── CustomGameActivity.java     # Approach 2: Manual GameSession control
-    │   ├── EmbeddedGameActivity.java   # Approach 3: MigoGameView embedding
+    │   ├── EmbeddedGameActivity.java   # Approach 2: MigoGameView embedding
+    │   ├── DebugMigoGameActivity.java  # Approach 1: MigoGameActivity debug wrapper
+    │   ├── GameConfigLoader.java       # Reads and parses code/game.json
+    │   ├── RuntimeConfigCompat.java    # Injects game config into RuntimeConfig
     │   ├── DemoGameLogHandler.java     # GameLogHandler sample
     │   ├── DemoSubpackageHandler.java  # SubpackageHandler sample
     │   ├── auth/
     │   │   └── ProxyAuthHandler.java   # AuthHandler sample
-    │   └── ui/
-    │       └── CapsuleMenu.java        # Capsule menu UI component
     └── AndroidManifest.xml
-
-AUTH_PROXY_RUNBOOK.md                    # Separate auth proxy runbook
 ```
 
 ## Game Directory Structure

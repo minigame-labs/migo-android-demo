@@ -13,6 +13,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Loads game.json from app private game code directory.
@@ -36,6 +37,7 @@ public final class GameConfigLoader {
     public static final class GameConfig {
         public final List<SubpackageDef> subPackages = new ArrayList<>();
         public String workersPath = null;
+        public String startupOrientation = null;
     }
 
     public static GameConfig load(Context context, String gameId) {
@@ -61,6 +63,7 @@ public final class GameConfigLoader {
             JSONObject root = new JSONObject(json);
             parseSubPackages(root, out);
             parseWorkers(root, out);
+            parseStartupOrientation(root, out);
         } catch (JSONException e) {
             Log.w(TAG, "Invalid game.json: " + gameJson.getAbsolutePath(), e);
         }
@@ -124,6 +127,18 @@ public final class GameConfigLoader {
         path = normalizeRoot(path);
         if (!path.isEmpty()) {
             out.workersPath = path;
+        }
+    }
+
+    private static void parseStartupOrientation(JSONObject root, GameConfig out) {
+        String orientation = trim(root.optString("deviceOrientation", ""));
+        if (orientation.isEmpty()) {
+            return;
+        }
+
+        String normalized = orientation.toLowerCase(Locale.US);
+        if ("landscape".equals(normalized) || "portrait".equals(normalized)) {
+            out.startupOrientation = normalized;
         }
     }
 

@@ -31,8 +31,9 @@ public class EmbeddedGameActivity extends Activity {
 
     private static final String GAME_ID = "migo-test-suit";
     private static final String GAME_ENTRY = "game.js";
+    public static final String EXTRA_AUTH_RELAY_URL = "auth_relay_url";
 
-    // Auth proxy relay server URL (same as CustomGameActivity)
+    // Auth proxy relay server URL
     private static final String DEFAULT_AUTH_RELAY_URL = "http://10.0.2.2:9527";
 
     private MigoGameView gameView;
@@ -41,7 +42,7 @@ public class EmbeddedGameActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        String relayUrl = getIntent().getStringExtra(CustomGameActivity.EXTRA_AUTH_RELAY_URL);
+        String relayUrl = getIntent().getStringExtra(EXTRA_AUTH_RELAY_URL);
         if (relayUrl == null || relayUrl.trim().isEmpty()) {
             relayUrl = DEFAULT_AUTH_RELAY_URL;
         }
@@ -94,6 +95,16 @@ public class EmbeddedGameActivity extends Activity {
         RuntimeConfig config = builder.build();
         gameView.setConfig(config);
 
+        gameView.setSessionCreatedListener(new MigoGameView.SessionCreatedListener() {
+            @Override
+            public void onSessionCreated(GameSession session) {
+                session.setGameLogHandler(new DemoGameLogHandler());
+                session.setSubpackageHandler(new DemoSubpackageHandler(session.getPaths().getCodeDir()));
+                session.setAuthHandler(new ProxyAuthHandler(finalRelayUrl, GAME_ID));
+                Log.i(TAG, "Host handlers registered: auth/gameLog/subpackage, relay=" + finalRelayUrl);
+            }
+        });
+
         // Set listener
         gameView.setGameListener(new GameSessionListener() {
             @Override
@@ -120,24 +131,6 @@ public class EmbeddedGameActivity extends Activity {
 
         // Load game
         gameView.loadGame(GAME_ID, GAME_ENTRY);
-
-        // Register host handlers once the session is available.
-        // MigoGameView creates the session internally after surface creation,
-        // so we poll in a background thread until getSession() returns non-null.
-        new Thread(() -> {
-            for (int i = 0; i < 200; i++) { // up to 10 seconds
-                GameSession s = gameView.getSession();
-                if (s != null) {
-                    s.setGameLogHandler(new DemoGameLogHandler());
-                    s.setSubpackageHandler(new DemoSubpackageHandler(s.getPaths().getCodeDir()));
-                    s.setAuthHandler(new ProxyAuthHandler(finalRelayUrl));
-                    Log.i(TAG, "Host handlers registered: auth/gameLog/subpackage, relay=" + finalRelayUrl);
-                    return;
-                }
-                try { Thread.sleep(50); } catch (InterruptedException e) { return; }
-            }
-            Log.w(TAG, "Timed out waiting for session to register host handlers");
-        }, "host-handler-setup").start();
     }
 
     private int dp(int dp) {

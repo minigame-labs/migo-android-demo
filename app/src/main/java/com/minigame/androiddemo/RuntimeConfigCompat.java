@@ -62,7 +62,31 @@ public final class RuntimeConfigCompat {
     }
 
     /**
-     * Inject parsed game.json fields into RuntimeConfig.Builder.
+     * Inject startup orientation if setStartupOrientation(String) exists.
+     */
+    public static RuntimeConfig.Builder injectStartupOrientation(
+            RuntimeConfig.Builder builder,
+            String startupOrientation
+    ) {
+        if (builder == null || startupOrientation == null) {
+            return builder;
+        }
+        String value = startupOrientation.trim();
+        if (value.isEmpty()) {
+            return builder;
+        }
+        try {
+            Method method = RuntimeConfig.Builder.class.getMethod(
+                    "setStartupOrientation", String.class);
+            method.invoke(builder, value);
+        } catch (Exception e) {
+            Log.w(TAG, "setStartupOrientation() not found in current SDK, skip startup orientation injection");
+        }
+        return builder;
+    }
+
+    /**
+     * Inject parsed host game config fields into RuntimeConfig.Builder.
      */
     public static RuntimeConfig.Builder injectFromGameConfig(
             RuntimeConfig.Builder builder,
@@ -76,6 +100,7 @@ public final class RuntimeConfigCompat {
         for (GameConfigLoader.SubpackageDef subPackage : gameConfig.subPackages) {
             injectSubPackage(builder, subPackage.name, subPackage.root);
         }
+        injectStartupOrientation(builder, gameConfig.startupOrientation);
         return builder;
     }
 }

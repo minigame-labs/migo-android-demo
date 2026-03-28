@@ -46,13 +46,15 @@ bash scripts/build-aar.sh release
 adb push your-game/ /data/data/com.minigame.androiddemo/files/migo/games/demo/code/
 ```
 
-> 注意：SDK 现在不会自动读取 `game.json` 来解析 `workers` / `subPackages`。
-> 本 Demo 已在宿主侧实现了 `code/game.json` 读取，并在创建 `RuntimeConfig` 时注入这些配置。
+> 注意：SDK 现在不会自动读取 `game.json`。
+> 本 Demo 已在宿主侧实现 `code/game.json` 读取，并在创建 `RuntimeConfig` 时注入
+> `workers` / `subPackages` / `deviceOrientation`（映射到 `startupOrientation`）。
 > 你也可以手动注入：
 
 ```java
 RuntimeConfig config = new RuntimeConfig.Builder(context)
     .setWorkersPath("workers")
+    .setStartupOrientation("landscape")
     // .addSubPackage("stage1", "subpackages/stage1")
     .build();
 ```
@@ -66,9 +68,9 @@ RuntimeConfig config = new RuntimeConfig.Builder(context)
 adb install app/build/outputs/apk/debug/app-debug.apk
 ```
 
-## 三种集成方式
+## 两种集成方式
 
-Demo 提供了三种不同的集成方式，按复杂度递增排列：
+Demo 仅保留两种官方接入方式：
 
 ### 方式 1：MigoGameActivity（最简单）
 
@@ -87,46 +89,7 @@ RuntimeConfig config = new RuntimeConfig.Builder(context)
 MigoGameActivity.launch(context, "demo", "game.js", config);
 ```
 
-### 方式 2：自定义 Activity（完全控制）
-
-手动管理 GameSession，适合需要自定义 UI 叠加层、自定义错误处理、或嵌入其他 Android 组件的场景。
-
-```java
-import com.migo.runtime.MigoRuntime;
-import com.migo.runtime.GameSession;
-import com.migo.runtime.RuntimeConfig;
-
-// 创建配置
-RuntimeConfig config = new RuntimeConfig.Builder(context)
-    .setTargetFps(60)
-    .setDebugEnabled(true)
-    .setCodeSigningEnabled(false)
-    .build();
-
-// 创建会话（安全版本，不抛异常）
-MigoRuntime.Result<GameSession> result = MigoRuntime.getInstance()
-    .createSessionSafe(activity, surface, config, "demo");
-
-if (result.isSuccess()) {
-    GameSession session = result.getValue();
-    session.setListener(listener);
-
-    // 最新 API: 可选注册宿主 handler（建议在 startGame 前）
-    session.setAuthHandler(authHandler);
-    session.setGameLogHandler(gameLogHandler);
-    session.setSubpackageHandler(subpackageHandler);
-
-    session.startGameSafe("game.js");
-}
-
-// 生命周期管理
-session.pause();    // Activity.onPause()
-session.resume();   // Activity.onResume()
-session.restart();  // 重启游戏
-session.close();    // Activity.onDestroy()
-```
-
-### 方式 3：MigoGameView（嵌入式）
+### 方式 2：MigoGameView（嵌入式）
 
 将游戏作为 View 嵌入到任意布局中，适合需要在游戏周围放置原生 UI 元素的场景。
 
@@ -150,13 +113,12 @@ myLayout.addView(gameView);
 // 加载游戏
 gameView.loadGame("demo", "game.js");
 
-// MigoGameView 会在内部创建 session，需在 session 可用后注册 handler
-GameSession session = gameView.getSession();
-if (session != null) {
+// 在 session 创建回调中注册 handler（startGame 前）
+gameView.setSessionCreatedListener(session -> {
     session.setAuthHandler(authHandler);
     session.setGameLogHandler(gameLogHandler);
     session.setSubpackageHandler(subpackageHandler);
-}
+});
 ```
 
 ## 监听事件
@@ -198,7 +160,37 @@ Demo 中的对应 sample 实现：
 - `app/src/main/java/com/minigame/androiddemo/DemoGameLogHandler.java`
 - `app/src/main/java/com/minigame/androiddemo/DemoSubpackageHandler.java`
 
-Auth 代理的独立操作文档见：`AUTH_PROXY_RUNBOOK.md`
+### Auth Relay 快速实施
+
+Relay 客户端入口：
+
+- `app/src/main/java/com/minigame/androiddemo/auth/ProxyAuthHandler.java`
+
+请求协议：
+
+- Endpoint: `POST {relayBaseUrl}/auth/request`
+- Body: `{"action":"login|checkSession|getUserInfo|getPhoneNumber","params":{...},"gameId":"..."}`
+
+返回协议：
+
+- 成功：`login/getPhoneNumber` 返回 `{"code":"..."}`，`checkSession` 返回 `{}`，`getUserInfo` 返回 `{"userInfo":...}`
+- 失败：`{"error":"reason","errno":123}`（`errno` 可选）
+
+Demo 接入点：
+
+- `DebugMigoGameActivity` 在 `onSessionCreated(...)` 注册 `ProxyAuthHandler`
+- `EmbeddedGameActivity` 在 `setSessionCreatedListener(...)` 注册 `ProxyAuthHandler`
+
+URL 配置：
+
+- 模拟器：`http://10.0.2.2:9527`
+- 真机：`http://<你的电脑局域网IP>:9527`
+
+排查建议：
+
+- 看 `ProxyAuthHandler` 和 Activity 日志是否收到回调
+- 确认 relay 收到 `/auth/request`
+- 确认 `gameId` 路由与桌面侧代理实例一致
 
 ## 项目结构
 
@@ -207,17 +199,15 @@ app/
 └── src/main/
     ├── java/.../
     │   ├── MainActivity.java           # Demo 选择器
-    │   ├── CustomGameActivity.java     # 方式 2: 手动 GameSession 管理
-    │   ├── EmbeddedGameActivity.java   # 方式 3: MigoGameView 嵌入
+    │   ├── EmbeddedGameActivity.java   # 方式 2: MigoGameView 嵌入
+    │   ├── DebugMigoGameActivity.java  # 方式 1: MigoGameActivity 调试封装
+    │   ├── GameConfigLoader.java       # 读取并解析 code/game.json
+    │   ├── RuntimeConfigCompat.java    # game.json 字段注入 RuntimeConfig
     │   ├── DemoGameLogHandler.java     # GameLogHandler sample
     │   ├── DemoSubpackageHandler.java  # SubpackageHandler sample
     │   ├── auth/
     │   │   └── ProxyAuthHandler.java   # AuthHandler sample
-    │   └── ui/
-    │       └── CapsuleMenu.java        # 胶囊菜单 UI 组件
     └── AndroidManifest.xml
-
-AUTH_PROXY_RUNBOOK.md                    # Auth 代理独立操作文档
 ```
 
 ## 游戏目录结构

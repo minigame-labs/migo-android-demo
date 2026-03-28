@@ -6,11 +6,11 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.SurfaceHolder;
 
+import com.migo.runtime.GameSession;
 import com.migo.runtime.MigoGameActivity;
 import com.migo.runtime.RuntimeConfig;
 import com.migo.runtime.callback.GameSessionListener;
-
-import java.lang.reflect.Field;
+import com.minigame.androiddemo.auth.ProxyAuthHandler;
 
 /**
  * Diagnostic wrapper for MigoGameActivity.
@@ -23,41 +23,55 @@ import java.lang.reflect.Field;
 public class DebugMigoGameActivity extends MigoGameActivity {
 
     private static final String TAG = "DebugMigoGameAct";
+    public static final String EXTRA_AUTH_RELAY_URL = "auth_relay_url";
+    private static final String DEFAULT_AUTH_RELAY_URL = "http://10.0.2.2:9527";
+
+    private String relayUrl = DEFAULT_AUTH_RELAY_URL;
+    private String gameId = "";
 
     public static void launch(Context context, String gameId, String entryPoint, RuntimeConfig config) {
-        if (config != null) {
-            applyPendingConfigForBaseActivity(config);
-        }
-        Intent intent = new Intent(context, DebugMigoGameActivity.class);
-        intent.putExtra(EXTRA_GAME_ID, gameId);
-        intent.putExtra(EXTRA_ENTRY_POINT, entryPoint);
-        if (!(context instanceof android.app.Activity)) {
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        }
-        context.startActivity(intent);
+        launch(context, gameId, entryPoint, config, DEFAULT_AUTH_RELAY_URL);
     }
 
-    private static void applyPendingConfigForBaseActivity(RuntimeConfig config) {
-        try {
-            Field lockField = MigoGameActivity.class.getDeclaredField("sConfigLock");
-            Field pendingField = MigoGameActivity.class.getDeclaredField("sPendingConfig");
-            lockField.setAccessible(true);
-            pendingField.setAccessible(true);
-            Object lock = lockField.get(null);
-            synchronized (lock) {
-                pendingField.set(null, config);
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "Failed to apply pending config via reflection, fallback to default", e);
+    public static void launch(
+            Context context,
+            String gameId,
+            String entryPoint,
+            RuntimeConfig config,
+            String relayUrl
+    ) {
+        Intent intent = buildLaunchIntent(
+                context,
+                DebugMigoGameActivity.class,
+                gameId,
+                entryPoint,
+                config
+        );
+        if (relayUrl != null && !relayUrl.trim().isEmpty()) {
+            intent.putExtra(EXTRA_AUTH_RELAY_URL, relayUrl.trim());
         }
+        context.startActivity(intent);
     }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        String gameId = getIntent().getStringExtra(EXTRA_GAME_ID);
+        gameId = getIntent().getStringExtra(EXTRA_GAME_ID);
         String entryPoint = getIntent().getStringExtra(EXTRA_ENTRY_POINT);
+        String relay = getIntent().getStringExtra(EXTRA_AUTH_RELAY_URL);
+        if (relay != null && !relay.trim().isEmpty()) {
+            relayUrl = relay.trim();
+        }
         Log.i(TAG, "onCreate gameId=" + gameId + ", entryPoint=" + entryPoint);
+        Log.i(TAG, "auth relay=" + relayUrl);
+    }
+
+    @Override
+    protected void onSessionCreated(GameSession session) {
+        session.setAuthHandler(new ProxyAuthHandler(relayUrl, gameId));
+        session.setGameLogHandler(new DemoGameLogHandler());
+        session.setSubpackageHandler(new DemoSubpackageHandler(session.getPaths().getCodeDir()));
+        Log.i(TAG, "Host handlers registered: auth/gameLog/subpackage");
     }
 
     @Override

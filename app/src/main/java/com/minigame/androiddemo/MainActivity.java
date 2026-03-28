@@ -18,10 +18,9 @@ import com.migo.runtime.RuntimeConfig;
 /**
  * Demo launcher Activity.
  * <p>
- * Shows three integration approaches:
+ * Shows two integration approaches:
  * <ol>
  *   <li><b>MigoGameActivity</b> - Zero-boilerplate, launch with one line</li>
- *   <li><b>Custom Activity</b> - Full control with manual GameSession management</li>
  *   <li><b>MigoGameView</b> - Embed a game inside any layout</li>
  * </ol>
  */
@@ -77,19 +76,14 @@ public class MainActivity extends Activity {
         Button btn1 = createButton("1. MigoGameActivity (Debug Logs)");
         btn1.setOnClickListener(v -> launchWithGameActivity());
 
-        // Option 2: Custom Activity with full GameSession control + host handlers
-        Button btn2 = createButton("2. Custom Activity (Full Control + Handlers)");
-        btn2.setOnClickListener(v -> launchCustomActivity());
-
-        // Option 3: Embedded MigoGameView (handlers registered after session creation)
-        Button btn3 = createButton("3. Embedded MigoGameView (+Handlers)");
-        btn3.setOnClickListener(v -> launchEmbeddedView());
+        // Option 2: Embedded MigoGameView (handlers registered after session creation)
+        Button btn2 = createButton("2. Embedded MigoGameView (+Handlers)");
+        btn2.setOnClickListener(v -> launchEmbeddedView());
 
         root.addView(title);
         root.addView(version);
         root.addView(btn1, buttonParams());
         root.addView(btn2, buttonParams());
-        root.addView(btn3, buttonParams());
 
         setContentView(root);
     }
@@ -105,26 +99,15 @@ public class MainActivity extends Activity {
                 ;
         RuntimeConfigCompat.injectFromGameConfig(builder, GameConfigLoader.load(this, GAME_ID));
         RuntimeConfig config = builder.build();
-        DebugMigoGameActivity.launch(this, GAME_ID, GAME_ENTRY, config);
+        DebugMigoGameActivity.launch(this, GAME_ID, GAME_ENTRY, config, AUTH_RELAY_URL);
     }
 
     /**
-     * Option 2: Launch game using a custom Activity with full control.
-     */
-    private void launchCustomActivity() {
-        Intent intent = new Intent(this, CustomGameActivity.class);
-        intent.putExtra("game_id", GAME_ID);
-        intent.putExtra("entry_point", GAME_ENTRY);
-        intent.putExtra(CustomGameActivity.EXTRA_AUTH_RELAY_URL, AUTH_RELAY_URL);
-        startActivity(intent);
-    }
-
-    /**
-     * Option 3: Launch the embedded MigoGameView demo.
+     * Option 2: Launch the embedded MigoGameView demo.
      */
     private void launchEmbeddedView() {
         Intent intent = new Intent(this, EmbeddedGameActivity.class);
-        intent.putExtra(CustomGameActivity.EXTRA_AUTH_RELAY_URL, AUTH_RELAY_URL);
+        intent.putExtra(EmbeddedGameActivity.EXTRA_AUTH_RELAY_URL, AUTH_RELAY_URL);
         startActivity(intent);
     }
 

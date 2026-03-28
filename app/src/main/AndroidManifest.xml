@@ -35,13 +35,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Demo 2: Custom Activity with full GameSession control -->
-        <activity
-            android:name=".CustomGameActivity"
-            android:exported="false"
-            android:configChanges="orientation|screenSize|keyboardHidden" />
-
-        <!-- Demo 3: Embedded MigoGameView -->
+        <!-- Demo 2: Embedded MigoGameView -->
         <activity
             android:name=".EmbeddedGameActivity"
             android:exported="false"
