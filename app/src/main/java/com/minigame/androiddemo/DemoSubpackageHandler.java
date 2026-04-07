@@ -43,8 +43,11 @@ public final class DemoSubpackageHandler implements SubpackageHandler {
 
         File targetDir = new File(codeDir, root);
         if (targetDir.isDirectory()) {
+            // Local directory already exists — no zip to provide.
+            // Pass null zipPath so the runtime skips ingest and mounts
+            // directly from the existing files.
             callback.onProgress(100, 1, 1);
-            callback.onSuccess();
+            callback.onSuccess(null);
             Log.i(TAG, "Using existing subpackage: " + targetDir.getAbsolutePath());
             return;
         }
