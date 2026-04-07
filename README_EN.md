@@ -138,10 +138,12 @@ session.setListener(new GameSessionListener() {
     }
 
     @Override
-    public void onError(int errorCode, String message, boolean recoverable) {
-        // Runtime error
-        // recoverable=true: non-fatal, game can continue
-        // recoverable=false: fatal, should close
+    public void onError(MigoException exception) {
+        int code = exception.getErrorCode();
+        String msg = exception.getMessage();
+        boolean recoverable = exception.isRecoverable();
+        // recoverable=true: session can continue
+        // recoverable=false: session must be restarted
     }
 });
 ```
@@ -192,6 +194,62 @@ Troubleshooting:
 - Verify relay receives `/auth/request`
 - Ensure `gameId` routing matches your desktop-side proxy instance
 
+## New APIs
+
+### Session State Listener
+
+```java
+session.setOnStateChangeListener((session, oldState, newState) -> {
+    Log.d("Game", "State: " + oldState + " -> " + newState);
+});
+
+// Query current state
+SessionState state = session.getState(); // CREATED, RUNNING, PAUSED, DESTROYED
+```
+
+### Performance Monitoring
+
+```java
+PerformanceSnapshot perf = session.getPerformanceSnapshot();
+if (perf != null) {
+    Log.d("Perf", "FPS=" + perf.fps + " frameTime=" + perf.frameTimeMs + "ms");
+}
+```
+
+### Host ↔ JS Communication
+
+```java
+// Java → JS: execute JavaScript code
+session.evaluateJavaScript("console.log('hello from host')");
+
+// JS → Java: receive game messages
+session.setMessageHandler((type, payload) -> {
+    Log.d("Game", "Message: type=" + type + " payload=" + payload);
+});
+```
+
+### Launch Failure Handling
+
+Extend `MigoGameActivity` and override `onLaunchFailed`:
+
+```java
+@Override
+protected void onLaunchFailed(int errorCode, String message) {
+    Toast.makeText(this, "Launch failed: " + message, Toast.LENGTH_LONG).show();
+    super.onLaunchFailed(errorCode, message); // default calls finish()
+}
+```
+
+### Error Diagnostics
+
+```java
+MigoRuntime runtime = MigoRuntime.getInstance();
+if (!runtime.isNativeLoaded()) {
+    Throwable error = runtime.getNativeLoadError();
+    Log.e("Init", "Native load failed", error);
+}
+```
+
 ## Project Structure
 
 ```
@@ -235,6 +293,10 @@ app/
 | `GameSessionListener` | Event callback interface |
 | `ErrorCode` | Error code constants |
 | `DebugOverlayView` | Debug overlay (auto-shown in debug mode) |
+| `SessionState` | Session lifecycle state enum |
+| `OnStateChangeListener` | State change listener |
+| `MigoException` | Structured exception (error code, cause chain, recoverability) |
+| `PerformanceSnapshot` | Performance metrics snapshot |
 
 ## License
 

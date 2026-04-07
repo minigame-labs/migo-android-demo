@@ -7,8 +7,10 @@ import android.util.Log;
 import android.view.SurfaceHolder;
 
 import com.migo.runtime.GameSession;
+import com.migo.runtime.MigoException;
 import com.migo.runtime.MigoGameActivity;
 import com.migo.runtime.RuntimeConfig;
+import com.migo.runtime.SessionState;
 import com.migo.runtime.callback.GameSessionListener;
 import com.minigame.androiddemo.auth.ProxyAuthHandler;
 
@@ -72,6 +74,16 @@ public class DebugMigoGameActivity extends MigoGameActivity {
         session.setGameLogHandler(new DemoGameLogHandler());
         session.setSubpackageHandler(new DemoSubpackageHandler(session.getPaths().getCodeDir()));
         Log.i(TAG, "Host handlers registered: auth/gameLog/subpackage");
+
+        // Demonstrate state change listener
+        session.setOnStateChangeListener((s, oldState, newState) ->
+            Log.d(TAG, "Session state: " + oldState + " -> " + newState));
+    }
+
+    @Override
+    protected void onLaunchFailed(int errorCode, String message) {
+        Log.e(TAG, "Launch failed: [" + errorCode + "] " + message);
+        super.onLaunchFailed(errorCode, message);
     }
 
     @Override
@@ -125,9 +137,11 @@ public class DebugMigoGameActivity extends MigoGameActivity {
             }
 
             @Override
-            public void onError(int errorCode, String message, boolean recoverable) {
-                Log.e(TAG, "listener.onError code=" + errorCode + ", recoverable="
-                        + recoverable + ", message=" + message);
+            public void onError(MigoException exception) {
+                Log.e(TAG, "listener.onError: " + exception);
+                if (!exception.isRecoverable()) {
+                    Log.e(TAG, "Fatal error, session must be restarted");
+                }
             }
 
             @Override

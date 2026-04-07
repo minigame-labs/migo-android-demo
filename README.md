@@ -138,10 +138,12 @@ session.setListener(new GameSessionListener() {
     }
 
     @Override
-    public void onError(int errorCode, String message, boolean recoverable) {
-        // 运行时错误
-        // recoverable=true: 可恢复错误（可继续运行）
-        // recoverable=false: 致命错误（建议关闭）
+    public void onError(MigoException exception) {
+        int code = exception.getErrorCode();
+        String msg = exception.getMessage();
+        boolean recoverable = exception.isRecoverable();
+        // recoverable=true: session can continue
+        // recoverable=false: session must be restarted
     }
 });
 ```
@@ -192,6 +194,62 @@ URL 配置：
 - 确认 relay 收到 `/auth/request`
 - 确认 `gameId` 路由与桌面侧代理实例一致
 
+## 新增 API
+
+### 会话状态监听
+
+```java
+session.setOnStateChangeListener((session, oldState, newState) -> {
+    Log.d("Game", "State: " + oldState + " -> " + newState);
+});
+
+// 查询当前状态
+SessionState state = session.getState(); // CREATED, RUNNING, PAUSED, DESTROYED
+```
+
+### 性能监控
+
+```java
+PerformanceSnapshot perf = session.getPerformanceSnapshot();
+if (perf != null) {
+    Log.d("Perf", "FPS=" + perf.fps + " frameTime=" + perf.frameTimeMs + "ms");
+}
+```
+
+### Host ↔ JS 通信
+
+```java
+// Java → JS：执行 JavaScript 代码
+session.evaluateJavaScript("console.log('hello from host')");
+
+// JS → Java：接收游戏消息
+session.setMessageHandler((type, payload) -> {
+    Log.d("Game", "Message: type=" + type + " payload=" + payload);
+});
+```
+
+### 启动失败处理
+
+继承 `MigoGameActivity` 并重写 `onLaunchFailed`：
+
+```java
+@Override
+protected void onLaunchFailed(int errorCode, String message) {
+    Toast.makeText(this, "启动失败: " + message, Toast.LENGTH_LONG).show();
+    super.onLaunchFailed(errorCode, message); // 默认调用 finish()
+}
+```
+
+### 错误诊断
+
+```java
+MigoRuntime runtime = MigoRuntime.getInstance();
+if (!runtime.isNativeLoaded()) {
+    Throwable error = runtime.getNativeLoadError();
+    Log.e("Init", "Native load failed", error);
+}
+```
+
 ## 项目结构
 
 ```
@@ -235,6 +293,10 @@ app/
 | `GameSessionListener` | 事件回调接口 |
 | `ErrorCode` | 错误码常量 |
 | `DebugOverlayView` | 调试面板（debug 模式自动显示） |
+| `SessionState` | 会话生命周期状态枚举 |
+| `OnStateChangeListener` | 状态变更监听器 |
+| `MigoException` | 结构化异常（含错误码、原因链、是否可恢复） |
+| `PerformanceSnapshot` | 性能指标快照 |
 
 ## 许可证
 

@@ -10,6 +10,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.migo.runtime.GameSession;
+import com.migo.runtime.MigoException;
 import com.migo.runtime.MigoGameView;
 import com.migo.runtime.RuntimeConfig;
 import com.migo.runtime.callback.GameSessionListener;
@@ -119,8 +120,8 @@ public class EmbeddedGameActivity extends Activity {
             }
 
             @Override
-            public void onError(int errorCode, String message, boolean recoverable) {
-                Log.e(TAG, "Embedded game error [" + errorCode + "]: " + message);
+            public void onError(MigoException exception) {
+                Log.e(TAG, "Game error: " + exception);
             }
         });
 
