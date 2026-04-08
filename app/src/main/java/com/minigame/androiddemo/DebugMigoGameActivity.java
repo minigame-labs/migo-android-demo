@@ -129,6 +129,12 @@ public class DebugMigoGameActivity extends MigoGameActivity {
             @Override
             public void onGameReady() {
                 Log.i(TAG, "listener.onGameReady");
+                // Enable performance profiling after game is loaded.
+                // View with: adb logcat | grep "\[MigoPerf\]"
+                GameSession s = getGameSession();
+                if (s != null) {
+                    s.evaluateJavaScript("_perf.enable()");
+                }
             }
 
             @Override
