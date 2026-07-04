@@ -1,6 +1,6 @@
 # Migo Android Demo
 
-[Migo](https://github.com/minigame-labs/migo) 小游戏运行时引擎的 Android 示例项目。
+[Migo](https://github.com/minigame-labs/migo)(嵌入式 HTML5 / 小游戏的 WebView 替代方案 —— 开源、高性能、跨引擎的原生游戏运行时)的 Android 示例项目。
 
 ## 快速开始
 

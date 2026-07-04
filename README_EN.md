@@ -1,6 +1,6 @@
 # Migo Android Demo
 
-Android sample project for the [Migo](https://github.com/minigame-labs/migo) mini-game runtime engine.
+Android sample project for [Migo](https://github.com/minigame-labs/migo) — the open, high-performance, cross-engine native runtime for embedded HTML5 / mini-games, a WebView replacement built for games.
 
 ## Quick Start
 
